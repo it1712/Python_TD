@@ -4,7 +4,9 @@ DEFAULT_CONFIG = {"fill": "purple",
                   "width": 1,
                   "cols":10,
                   "rows":10,
-                  "enemy_size":8}
+                  "enemy_size":25}
+
+from math import sqrt
 
 class Point():
     def __init__(self, x, y):
@@ -38,6 +40,7 @@ class Build(Square):
         #self.can_be_path = pathable
         #self.fill_color = "green" if self.can_be_path else "red"
         self.fill_color = DEFAULT_CONFIG["fill"]
+        self.path = False
 
     def draw(self, canvas):
         return canvas.create_rectangle(self.x, self.y, self.x + self.side, self.y + self.side, fill=self.fill_color,
@@ -53,6 +56,7 @@ class Path(Square):
         self.fill_color = "blue"
         self.start = start
         self.end = end
+        self.path = True
 
     def draw(self, canvas):
         return canvas.create_rectangle(self.x, self.y, self.x + self.side, self.y + self.side, fill=self.fill_color,
@@ -87,7 +91,7 @@ class Enemy(Square):
         self.side = DEFAULT_CONFIG["enemy_size"]
 
     def draw(self, canvas):
-        return canvas.create_oval(self.x, self.y, self.x + self.side, self.y + self.side, fill=self.fill_color,
+        return canvas.create_oval(self.x - self.side / 2, self.y - self.side / 2, self.x + self.side / 2, self.y + self.side / 2, fill=self.fill_color,
                                   outline=self.outline_color, width=self.outline_width)
 
     def move(self):
@@ -97,38 +101,42 @@ class Enemy(Square):
     def set_dir(self, squares):
         closest_point = Point(10000, 10000)
         for s in squares:
-            point = Point(s.x + s.side / 2, s.y + s.side / 2)
-            print("--")
-            print(point.x)
-            print(point.y)
-            print("--")
-            if s not in self.passed and pow(pow(point.x - self.x, 2) + pow(point.y - self.y, 2), 1/2) < pow(pow(closest_point.x - self.x, 2) + pow(closest_point.y - self.y, 2), 1/2):
-                closest_point = point
+            if s.path:
 
-                print(closest_point.x)
-                print(closest_point.y)
-        #dX = point.x - self.x
-        #dY = point.y - self.y
+                point = Point(s.x + s.side / 2, s.y + s.side / 2)
+                print("--Processing point:")
+                print(point.x)
+                print(point.y)
+                print("--")
+    #dxc = distance - x - closest(point)
+    #dx = distance - x
+    #dist = distance po pyt. větě (dist_closest... logicky)
 
-        #self.vel_x = (dX) / (dX) if abs(dX) > abs(point.y - self.y) else (dX) / (point.y - self.y)
-        #self.vel_y = (point.y - self.y) / (point.y - self.y) if abs(point.y - self.y) > abs(point.x - self.x) else (point.y - self.y) / (point.x - self.x)
+                dxc = closest_point.x - self.x
+                dyc = closest_point.y - self.y
+                dist_closest = sqrt(pow(dxc, 2) + pow(dyc, 2))
+                dx = point.x - self.x
+                dy = point.y - self.y
+                dist = sqrt(pow(dx, 2) + pow(dy, 2))
 
-        dX = closest_point.x - self.x
-        dY = closest_point.y - self.y
+                #Pozor na mocniny - dělají abs
 
-        if dX == 0:
+                if s not in self.passed and dist < dist_closest:
+                    print("self.x: {}, self.y: {}".format(self.x,self.y))
+                    print("closest point updated: {}, {}".format(closest_point.x, closest_point.y))
+                    print("self.passed: {}".format(self.passed))
+                    closest_point = point
+
+
+        if dxc == 0:
             self.vel_x = 0
         else:
             self.vel_x = (closest_point.x - self.x) / (closest_point.x - self.x) if abs(closest_point.x - self.x) > abs(closest_point.y - self.y) else (closest_point.x - self.x) / (closest_point.y - self.y)
 
-        if dY == 0:
+        if dyc == 0:
             self.vel_y = 0
         else:
             self.vel_y = (closest_point.y - self.y) / (closest_point.y - self.y) if abs(closest_point.y - self.y) > abs(closest_point.x - self.x) else (closest_point.y - self.y) / (closest_point.x - self.x)
-
-
-
-
 
 
         print("Vel_x: {}, Vel_y: {}".format(self.vel_x, self.vel_y))
@@ -136,6 +144,11 @@ class Enemy(Square):
 
     def set_passed(self, squares):
         for s in squares:
-            if abs(self.x + self.side / 2 - s.x < 5) and abs(self.y + self.side / 2 - s.y < 5):
-                self.passed.append(s)
-        print("penis")
+            if s.path:
+                point = Point(s.x + s.side / 2, s.y + s.side / 2)
+                dx = point.x - self.x
+                dy = point.y - self.y
+                dist = sqrt(pow(dx, 2) + pow(dy, 2))
+                if dist < 20:
+                    self.passed.append(s)
+                    print("Passed appended: {}".format(s))

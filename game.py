@@ -87,7 +87,7 @@ class MyApp:
 
     def create_wave(self):
         for i in range(1):
-            self.enemy = Enemy(self.enemy_start_x - 4, self.enemy_start_y - 4)
+            self.enemy = Enemy(self.enemy_start_x, self.enemy_start_y)
             self.enemys.append(self.enemy)
 
     def loop(self):
