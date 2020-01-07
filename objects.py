@@ -83,7 +83,7 @@ class Enemy(Square):
     def __init__(self, x, y):
         super().__init__(x, y)
         self.hp = 100
-        self.speed = 0.5
+        self.speed = 1
         self.vel_x = 1
         self.vel_y = 0
         self.passed = []
@@ -127,17 +127,22 @@ class Enemy(Square):
                     print("self.passed: {}".format(self.passed))
                     closest_point = point
 
+        dxc = abs(closest_point.x - self.x)
+        dyc = abs(closest_point.y - self.y)
 
         if dxc == 0:
             self.vel_x = 0
         else:
-            self.vel_x = (closest_point.x - self.x) / (closest_point.x - self.x) if abs(closest_point.x - self.x) > abs(closest_point.y - self.y) else (closest_point.x - self.x) / (closest_point.y - self.y)
+            self.vel_x = abs(dxc) / dxc if abs(dxc) > abs(dyc) else abs(dxc) / dyc
+        if closest_point.x - self.x < 0:
+            self.vel_x *= -1
 
         if dyc == 0:
             self.vel_y = 0
         else:
-            self.vel_y = (closest_point.y - self.y) / (closest_point.y - self.y) if abs(closest_point.y - self.y) > abs(closest_point.x - self.x) else (closest_point.y - self.y) / (closest_point.x - self.x)
-
+            self.vel_y = abs(dyc) / dyc if abs(dyc) > abs(dxc) else abs(dyc) / dxc
+        if closest_point.y - self.y < 0:
+            self.vel_y *= -1
 
         print("Vel_x: {}, Vel_y: {}".format(self.vel_x, self.vel_y))
 
@@ -149,6 +154,8 @@ class Enemy(Square):
                 dx = point.x - self.x
                 dy = point.y - self.y
                 dist = sqrt(pow(dx, 2) + pow(dy, 2))
-                if dist < 20:
+                if dist < 5:
                     self.passed.append(s)
                     print("Passed appended: {}".format(s))
+
+                    #UPRAV SI PAK CPU USAGE!!!!!!!!!!! aspoň to zkus

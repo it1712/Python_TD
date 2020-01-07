@@ -14,6 +14,7 @@ class MyApp:
         self.first_wave = 10
         self.wave_difference = 2
         self.current_wave = self.first_wave
+        self.wave_number = 1
         #self.template = [[1]*DEFAULT_CONFIG["cols"]]*DEFAULT_CONFIG["rows"]
         self.template = [
             [1,1,1,1,1,1,1,1,1,1],
@@ -55,9 +56,9 @@ class MyApp:
         button_rectangle.pack(side=LEFT)
         button_rectangle = Button(self.container, text="Turret 2", command=self.p)
         button_rectangle.pack(side=LEFT)
-        button_rectangle = Button(self.container, text="Turret 3", command=self.p)
+        button_rectangle = Button(self.container, text="add", command=self.add_enemy)
         button_rectangle.pack(side=LEFT)
-        button_rectangle = Button(self.container, text="Turret 4", command=self.p)
+        button_rectangle = Button(self.container, text="Next wave", command=self.create_wave)
         button_rectangle.pack(side=LEFT)
         button_rectangle = Button(self.container, text="Prodat", command=self.p)
         button_rectangle.pack(side=RIGHT)
@@ -86,9 +87,20 @@ class MyApp:
         pass
 
     def create_wave(self):
-        for i in range(1):
-            self.enemy = Enemy(self.enemy_start_x, self.enemy_start_y)
-            self.enemys.append(self.enemy)
+        #root.after(2000, self.create_wave, self)
+        self.current_wave = self.first_wave + self.wave_difference * self.wave_number
+        self.create_enemy()
+        self.wave_number += 1
+
+    def add_enemy(self):
+        self.enemy = Enemy(self.enemy_start_x, self.enemy_start_y)
+        self.enemys.append(self.enemy)
+        #self.create_enemy()
+
+    def create_enemy(self):
+        if self.current_wave > 0:
+            self.current_wave -= 1
+            root.after(2000, self.add_enemy)
 
     def loop(self):
         for enemy in self.enemys:
@@ -203,7 +215,6 @@ root = Tk()
 myapp = MyApp(root)
 #sdfasd
 myapp.create_game()
-myapp.create_wave()
 myapp.loop()
 #sdfasd
 root.mainloop()
