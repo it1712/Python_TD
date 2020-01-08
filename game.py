@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 from tkinter import *
-from tkinter import messagebox, colorchooser
+from tkinter.messagebox import *
+from tkinter.filedialog import *
 from objects import *
+from json import dumps
+from ast import literal_eval
+from PIL import Image, ImageTk
 
 class MyApp:
     def __init__(self, parent):
@@ -30,19 +34,44 @@ class MyApp:
         ]
         self.squares = []
         self.square = None
-        self.phase = "build"
+        self.phase = ""
         self.parent = parent
         self.drawWidgets()
         self.enemy = None
         self.enemys = []
         self.enemy_start_x = None
         self.enemy_start_y = None
+        self.hp = 5
+        self.money = 500
+        self.image = Image.open("image.jpg")
+        self.image = self.image.resize((int(DEFAULT_CONFIG["enemy_size"] / sqrt(2)), int(DEFAULT_CONFIG["enemy_size"] / sqrt(2))), Image.ANTIALIAS)
+        self.img = ImageTk.PhotoImage(self.image)
+        self.file = None
+        self.breakloop = False
+
+    def set_default(self):
+        self.enemy = None
+        self.enemys = []
+        self.enemy_start_x = None
+        self.enemy_start_y = None
+        self.hp = 5
+        self.money = 500
+        self.squares = []
+        self.square = None
+        self.current_wave = 0
+        self.wave_number = 1
+        self.start_x = 0
+        self.start_y = 0
+        self.x = 0
+        self.y = DEFAULT_CONFIG["side"]
+        self.phase = "shopping"
+        self.breakloop = False
 
     def drawWidgets(self):
         screen_width = self.parent.winfo_screenwidth()
         screen_height = self.parent.winfo_screenheight()
-        self.container = Frame(self.parent, width=screen_width - 50, height=300, bg="gray")
-        self.canvas = Canvas(self.parent, width=screen_width - 50, height=screen_height - 350, bg=self.color_bg)
+        self.container = Frame(self.parent, width=DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"], height=169999, bg="gray")
+        self.canvas = Canvas(self.parent, width=DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"], height=DEFAULT_CONFIG["side"] * (DEFAULT_CONFIG["rows"] + 2), bg=self.color_bg)
         self.canvas.pack(fill=BOTH, expand=True)
         self.canvas.bind("<ButtonPress-1>", self.on_button_press)
         self.canvas.bind("<ButtonPress-3>", self.on_button_press)
@@ -72,6 +101,8 @@ class MyApp:
         self.parent.config(menu=menu)
         filemenu = Menu(menu)
         menu.add_cascade(label='Soubor', menu=filemenu)
+        filemenu.add_command(label='Uložit herní pole', command=self.save_template)
+        filemenu.add_command(label='Načíst herní pole', command=self.load_template)
         filemenu.add_command(label='Konec', command=self.parent.destroy)
         canvasmenu = Menu(menu)
         menu.add_cascade(label='Plátno', menu=canvasmenu)
@@ -86,37 +117,69 @@ class MyApp:
     def p(self):
         pass
 
+    def load_template(self):
+        self.breakloop = True
+        self.file = askopenfile(mode="r",initialdir="./templates/", title = "Vyber soubor", filetypes = (("PythonTowerDefense Template", "*.temp"), ("Všechny soubory", "*.*")))
+        file_content = self.file.read()
+        #file_content = self.file
+        print(file_content)
+        self.template = literal_eval(file_content)
+        print(self.template)
+        self.file.close()
+        self.file = None
+        self.create_game()
+
+
+    def save_template(self):
+        self.file = asksaveasfile(mode="w",defaultextension=".temp",initialdir="./templates/",title = "Uložit soubor")
+        self.file.write(dumps(self.template))
+        self.file.close()
+        self.file = None
+
     def create_wave(self):
         #root.after(2000, self.create_wave, self)
-        self.current_wave = self.first_wave + self.wave_difference * self.wave_number
+        self.current_wave = self.first_wave + self.wave_difference * (self.wave_number - 1)
+        self.phase = "wave"
         self.create_enemy()
         self.wave_number += 1
 
     def add_enemy(self):
-        self.enemy = Enemy(self.enemy_start_x, self.enemy_start_y)
-        self.enemys.append(self.enemy)
-        #self.create_enemy()
+        if self.phase == "wave":
+            self.enemy = Enemy(self.enemy_start_x, self.enemy_start_y)
+            self.enemy.img = self.img
+            for square in self.squares:
+                if square.path:
+                    self.enemy.path.append(square)
+            self.enemys.insert(0,self.enemy)
+            self.create_enemy()
 
     def create_enemy(self):
         if self.current_wave > 0:
             self.current_wave -= 1
             root.after(2000, self.add_enemy)
+        else:
+            self.phase = "shopping"
 
     def loop(self):
         for enemy in self.enemys:
-            enemy.set_passed(self.squares)
-            enemy.set_dir(self.squares)
+            enemy.set_passed()
             enemy.move()
-            self.redraw_canvas()
-        root.after(10, MyApp.loop, self)
-
-    def change_fill_color(self):  # changing the fill color
-        if self.square:
-            #            self.square.fill_color = colorchooser.askcolor(color=self.square.fill_color)[1]
-            self.square.fill_color = "green"
-            self.redraw_canvas()
+            if enemy.dead():
+                self.enemys.remove(enemy)
+            if enemy.reached_end():
+                self.hp -= 1
+                self.enemys.remove(enemy)
+        self.redraw_canvas()
+        if self.hp > 0:
+            if not self.breakloop:
+                root.after(int(1000/24), self.loop)
         else:
-            print("Objekt neexistuje")
+            print("Konec hry")
+            if askyesno('Konec hry', 'Chcete začít novou hru?'):
+                self.create_game()
+                print("_____________NEW GAME_____________")
+            else:
+                self.parent.destroy()
 
     def clear_canvas(self):
         self.canvas.delete("all")
@@ -131,8 +194,7 @@ class MyApp:
         print("Překreslit canvas")
 
     def create_game(self):
-        self.x = 0
-        self.y = 0
+        self.set_default()
         for i in range(len(self.template)):
             for j in range(len(self.template[i])):
                 print(self.template[i][j], end=" ")
@@ -140,10 +202,12 @@ class MyApp:
                     self.square = Path(self.x, self.y)
                     if self.template[i][j] == 3:
                         self.square.start = True
+                        self.square.fill_color = "green"
                         self.enemy_start_x = self.square.x + DEFAULT_CONFIG["side"] / 2
                         self.enemy_start_y = self.square.y + DEFAULT_CONFIG["side"] / 2
                     if self.template[i][j] == 4:
                         self.square.end = True
+                        self.square.fill_color = "red"
                 if self.template[i][j] == 1:
                     self.square = Build(self.x, self.y)
                 self.squares.append(self.square)
@@ -152,10 +216,12 @@ class MyApp:
             self.y += DEFAULT_CONFIG["side"]
             self.x -= DEFAULT_CONFIG["side"] * len(self.template[i])
         self.redraw_canvas()
+        self.breakloop = False
+        self.loop()
 
-    # def info_box(self):
-    #      messagebox.showinfo('Message title', 'Message content')
-    #       print("Zobrazí info")
+    def nova_hra_dialog(self):
+        showinfo('KONEC HRY', 'Message content')
+        print("mesagebox - endgame")
 
     def on_button_press(self, event):
         self.start_x = self.canvas.canvasx(event.x)
@@ -215,6 +281,5 @@ root = Tk()
 myapp = MyApp(root)
 #sdfasd
 myapp.create_game()
-myapp.loop()
 #sdfasd
 root.mainloop()

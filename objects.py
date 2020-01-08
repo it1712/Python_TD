@@ -1,12 +1,14 @@
+from math import sqrt
+from PIL import Image, ImageTk
+
 DEFAULT_CONFIG = {"fill": "purple",
-                  "side": 50,
+                  "side": 80,
                   "outline": "black",
                   "width": 1,
                   "cols":10,
                   "rows":10,
-                  "enemy_size":25}
+                  "enemy_size":40}
 
-from math import sqrt
 
 class Point():
     def __init__(self, x, y):
@@ -58,6 +60,7 @@ class Path(Square):
         self.end = end
         self.path = True
 
+
     def draw(self, canvas):
         return canvas.create_rectangle(self.x, self.y, self.x + self.side, self.y + self.side, fill=self.fill_color,
                                        outline=self.outline_color, width=self.outline_width)
@@ -83,49 +86,52 @@ class Enemy(Square):
     def __init__(self, x, y):
         super().__init__(x, y)
         self.hp = 100
-        self.speed = 1
+        self.speed = 5
         self.vel_x = 1
         self.vel_y = 0
-        self.passed = []
         self.fill_color = "orange"
         self.side = DEFAULT_CONFIG["enemy_size"]
+        self.path = []
+        self.img = None
+        self.img_side = self.side / (2 * sqrt(2))
 
     def draw(self, canvas):
-        return canvas.create_oval(self.x - self.side / 2, self.y - self.side / 2, self.x + self.side / 2, self.y + self.side / 2, fill=self.fill_color,
-                                  outline=self.outline_color, width=self.outline_width)
+        canvas.create_oval(self.x - self.side / 2, self.y - self.side / 2, self.x + self.side / 2, self.y + self.side / 2, fill=self.fill_color, outline=self.outline_color, width=self.outline_width)
+        canvas.create_image(self.x , self.y , image=self.img)
+        #canvas.create_image
+        return True
 
     def move(self):
         self.x += self.vel_x * self.speed
         self.y += self.vel_y * self.speed
 
-    def set_dir(self, squares):
+    def set_dir(self):
         closest_point = Point(10000, 10000)
-        for s in squares:
-            if s.path:
+        for s in self.path:
 
-                point = Point(s.x + s.side / 2, s.y + s.side / 2)
-                print("--Processing point:")
-                print(point.x)
-                print(point.y)
-                print("--")
-    #dxc = distance - x - closest(point)
-    #dx = distance - x
-    #dist = distance po pyt. větě (dist_closest... logicky)
+            point = Point(s.x + s.side / 2, s.y + s.side / 2)
+            print("--Processing point:")
+            print(point.x)
+            print(point.y)
+            print("--")
+#dxc = distance - x - closest(point)
+#dx = distance - x
+#dist = distance po pyt. větě (dist_closest... logicky)
 
-                dxc = closest_point.x - self.x
-                dyc = closest_point.y - self.y
-                dist_closest = sqrt(pow(dxc, 2) + pow(dyc, 2))
-                dx = point.x - self.x
-                dy = point.y - self.y
-                dist = sqrt(pow(dx, 2) + pow(dy, 2))
+            dxc = closest_point.x - self.x
+            dyc = closest_point.y - self.y
+            dist_closest = sqrt(pow(dxc, 2) + pow(dyc, 2))
+            dx = point.x - self.x
+            dy = point.y - self.y
+            dist = sqrt(pow(dx, 2) + pow(dy, 2))
 
-                #Pozor na mocniny - dělají abs
+            #Pozor na mocniny - dělají abs
 
-                if s not in self.passed and dist < dist_closest:
-                    print("self.x: {}, self.y: {}".format(self.x,self.y))
-                    print("closest point updated: {}, {}".format(closest_point.x, closest_point.y))
-                    print("self.passed: {}".format(self.passed))
-                    closest_point = point
+            if dist < dist_closest:
+                print("self.x: {}, self.y: {}".format(self.x,self.y))
+                print("closest point updated: {}, {}".format(closest_point.x, closest_point.y))
+                print("self.path: {}".format(self.path))
+                closest_point = point
 
         dxc = abs(closest_point.x - self.x)
         dyc = abs(closest_point.y - self.y)
@@ -147,15 +153,25 @@ class Enemy(Square):
         print("Vel_x: {}, Vel_y: {}".format(self.vel_x, self.vel_y))
 
 
-    def set_passed(self, squares):
-        for s in squares:
-            if s.path:
-                point = Point(s.x + s.side / 2, s.y + s.side / 2)
-                dx = point.x - self.x
-                dy = point.y - self.y
-                dist = sqrt(pow(dx, 2) + pow(dy, 2))
-                if dist < 5:
-                    self.passed.append(s)
-                    print("Passed appended: {}".format(s))
+    def set_passed(self):
+        for s in self.path:
+            point = Point(s.x + s.side / 2, s.y + s.side / 2)
+            dx = point.x - self.x
+            dy = point.y - self.y
+            dist = sqrt(pow(dx, 2) + pow(dy, 2))
+            if dist < 5:
+                self.path.remove(s)
+                print("Passed appended: {}".format(s))
+                self.set_dir()
 
-                    #UPRAV SI PAK CPU USAGE!!!!!!!!!!! aspoň to zkus
+    def reached_end(self):
+        if len(self.path) == 0:
+            return True
+        else:
+            return False
+
+    def dead(self):
+        if self.hp < 1:
+            return True
+        else:
+            return False
