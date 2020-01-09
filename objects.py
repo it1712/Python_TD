@@ -141,7 +141,7 @@ class Bullet(Square):
         self.vel_x = vel_x
         self.vel_y = vel_y
         self.enemies = []
-
+        #MAYBE UDĚLEJ V GAME.PY AŤ SE NEMUSÍ FURT NĚJAK VKLÁDAT self.enemies KVŮLI HODNOTÁM x A y.. Attack taky
     def draw(self, canvas):
         return canvas.create_oval(self.x - self.side / 2, self.y - self.side / 2, self.x + self.side / 2, self.y + self.side / 2,
                                   fill=self.fill_color, outline="")
