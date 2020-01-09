@@ -6,15 +6,18 @@ from objects import *
 from json import dumps
 from ast import literal_eval
 from PIL import Image, ImageTk
+import sched, time
 
 class MyApp:
     def __init__(self, parent):
         self.color_fg = 'black'
-        self.color_bg = 'white'
+        self.color_bg = 'grey'
         self.start_x = 0
         self.start_y = 0
         self.x = 0
         self.y = 0
+        self.width = DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"]
+        self.height = DEFAULT_CONFIG["side"] * (DEFAULT_CONFIG["rows"] + 1)
         self.first_wave = 10
         self.wave_difference = 2
         self.current_wave = self.first_wave
@@ -38,7 +41,7 @@ class MyApp:
         self.parent = parent
         self.drawWidgets()
         self.enemy = None
-        self.enemys = []
+        self.enemies = []
         self.enemy_start_x = None
         self.enemy_start_y = None
         self.hp = 5
@@ -48,10 +51,18 @@ class MyApp:
         self.img = ImageTk.PhotoImage(self.image)
         self.file = None
         self.breakloop = False
+        self.turrets = []
+        self.turret = None
+        self.bullets = []
+        self.bullet = None
 
     def set_default(self):
+        self.bullets = []
+        self.bullet = None
+        self.turret = None
+        self.turrets = []
         self.enemy = None
-        self.enemys = []
+        self.enemies = []
         self.enemy_start_x = None
         self.enemy_start_y = None
         self.hp = 5
@@ -71,7 +82,7 @@ class MyApp:
         screen_width = self.parent.winfo_screenwidth()
         screen_height = self.parent.winfo_screenheight()
         self.container = Frame(self.parent, width=DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"], height=169999, bg="gray")
-        self.canvas = Canvas(self.parent, width=DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"], height=DEFAULT_CONFIG["side"] * (DEFAULT_CONFIG["rows"] + 2), bg=self.color_bg)
+        self.canvas = Canvas(self.parent, width=DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"], height=DEFAULT_CONFIG["side"] * (DEFAULT_CONFIG["rows"] + 1), bg=self.color_bg)
         self.canvas.pack(fill=BOTH, expand=True)
         self.canvas.bind("<ButtonPress-1>", self.on_button_press)
         self.canvas.bind("<ButtonPress-3>", self.on_button_press)
@@ -81,7 +92,7 @@ class MyApp:
 
         #Vybrat věž, do proměnné self.currentturretasivole -> vybranou turretu -> podle toho vybrat
         #Hlavně pak udělat nahrazení v self.squares na správné pozici
-        button_rectangle = Button(self.container, text="Turret 1", command=self.p)
+        button_rectangle = Button(self.container, text="Turret 1", command=self.turret_add)
         button_rectangle.pack(side=LEFT)
         button_rectangle = Button(self.container, text="Turret 2", command=self.p)
         button_rectangle.pack(side=LEFT)
@@ -99,27 +110,21 @@ class MyApp:
 
         menu = Menu(self.parent)
         self.parent.config(menu=menu)
+        gamemenu = Menu(menu)
+        menu.add_cascade(label='Hra', menu=gamemenu)
+        gamemenu.add_command(label='Nová hra', command=self.create_game)
+        gamemenu.add_command(label='Konec', command=self.parent.destroy)
         filemenu = Menu(menu)
         menu.add_cascade(label='Soubor', menu=filemenu)
         filemenu.add_command(label='Uložit herní pole', command=self.save_template)
         filemenu.add_command(label='Načíst herní pole', command=self.load_template)
-        filemenu.add_command(label='Konec', command=self.parent.destroy)
-        canvasmenu = Menu(menu)
-        menu.add_cascade(label='Plátno', menu=canvasmenu)
-        canvasmenu.add_command(label='Vyčistit plátno', command=self.clear_canvas)
-        canvasmenu.add_command(label='Překreslit plátno', command=self.redraw_canvas)
-        objectsmenu = Menu(menu)
-        menu.add_cascade(label='Věž', menu=objectsmenu)
-        objectsmenu.add_command(label='Vylepšit', command=self.p)
-        objectsmenu.add_command(label='Prodat', command=self.p)
-
 
     def p(self):
         pass
 
     def load_template(self):
         self.breakloop = True
-        self.file = askopenfile(mode="r",initialdir="./templates/", title = "Vyber soubor", filetypes = (("PythonTowerDefense Template", "*.temp"), ("Všechny soubory", "*.*")))
+        self.file = askopenfile(mode="r", initialdir="./templates/", title="Vyber soubor", filetypes=(("PythonTowerDefense Template", "*.temp"), ("Všechny soubory", "*.*")))
         file_content = self.file.read()
         #file_content = self.file
         print(file_content)
@@ -129,9 +134,8 @@ class MyApp:
         self.file = None
         self.create_game()
 
-
     def save_template(self):
-        self.file = asksaveasfile(mode="w",defaultextension=".temp",initialdir="./templates/",title = "Uložit soubor")
+        self.file = asksaveasfile(mode="w", defaultextension=".temp", initialdir="./templates/", title="Uložit soubor")
         self.file.write(dumps(self.template))
         self.file.close()
         self.file = None
@@ -150,7 +154,7 @@ class MyApp:
             for square in self.squares:
                 if square.path:
                     self.enemy.path.append(square)
-            self.enemys.insert(0,self.enemy)
+            self.enemies.insert(0,self.enemy)
             self.create_enemy()
 
     def create_enemy(self):
@@ -161,25 +165,26 @@ class MyApp:
             self.phase = "shopping"
 
     def loop(self):
-        for enemy in self.enemys:
+        for enemy in self.enemies:
             enemy.set_passed()
             enemy.move()
             if enemy.dead():
-                self.enemys.remove(enemy)
+                self.enemies.remove(enemy)
             if enemy.reached_end():
                 self.hp -= 1
-                self.enemys.remove(enemy)
+                self.enemies.remove(enemy)
+        for bullet in self.bullets:
+            bullet.enemies = self.enemies
+            bullet.move()
+            bullet.hit_enemy()
+            if bullet.x < 0 or bullet.y < DEFAULT_CONFIG["side"] or bullet.x > self.width or bullet.y > DEFAULT_CONFIG["side"] * (DEFAULT_CONFIG["rows"] + 1) or bullet.destroyed:
+                self.bullets.remove(bullet)
         self.redraw_canvas()
         if self.hp > 0:
             if not self.breakloop:
                 root.after(int(1000/24), self.loop)
         else:
-            print("Konec hry")
-            if askyesno('Konec hry', 'Chcete začít novou hru?'):
-                self.create_game()
-                print("_____________NEW GAME_____________")
-            else:
-                self.parent.destroy()
+            self.end_game_dialog()
 
     def clear_canvas(self):
         self.canvas.delete("all")
@@ -189,8 +194,14 @@ class MyApp:
         self.clear_canvas()
         for square in self.squares:
             square.draw(self.canvas)
-        for enemy in self.enemys:
+        for enemy in self.enemies:
             enemy.draw(self.canvas)
+        for turret in self.turrets:
+            turret.draw(self.canvas)
+        for bullet in self.bullets:
+            bullet.draw(self.canvas)
+        if self.turret:
+            self.turret.draw_range(self.canvas)
         print("Překreslit canvas")
 
     def create_game(self):
@@ -215,13 +226,30 @@ class MyApp:
             print("\n")
             self.y += DEFAULT_CONFIG["side"]
             self.x -= DEFAULT_CONFIG["side"] * len(self.template[i])
+            self.square = None
         self.redraw_canvas()
         self.breakloop = False
         self.loop()
 
-    def nova_hra_dialog(self):
-        showinfo('KONEC HRY', 'Message content')
-        print("mesagebox - endgame")
+    def end_game_dialog(self):
+        print("Konec hry")
+        if askyesno('Konec hry', 'Chcete začít novou hru?'):
+            self.create_game()
+            print("_____________NEW GAME_____________")
+        else:
+            self.parent.destroy()
+
+    def turret_add(self):
+        if self.square and not self.square.path:
+            if not self.square.turret_built:
+                self.turret = Turret(self.square.x, self.square.y)
+                self.turret.enemies = self.enemies
+                self.bullet = self.turret.attack()
+                if self.bullet:
+                    self.bullets.append(self.bullet)
+                self.turrets.append(self.turret)
+                self.square.turret_built = True
+                print(self.turrets)
 
     def on_button_press(self, event):
         self.start_x = self.canvas.canvasx(event.x)
@@ -229,16 +257,30 @@ class MyApp:
         point = Point(self.start_x, self.start_y)
         #self.action = ""
         print(event)
-        for i, s in enumerate(self.squares):
-            if s.detect_cursor(point):
+        self.square = None
+        for idx, square in enumerate(self.squares):
+            if not square.path and square.fill_color != DEFAULT_CONFIG["fill"]:
+                self.squares[idx].fill_color = DEFAULT_CONFIG["fill"]
+            if square.detect_cursor(point):
+                self.square = None
                 if event.num == 1:
-                    pass
+                    if not square.path:
+                        self.square = square
+                        self.squares[idx].fill_color = "pink"
                     # print("Path")
                     #self.squares[i] = Path(s.x, s.y)
+
             # if event.num == 3:
             #print("Build")
             # self.squares[i] = Build(s.x, s.y)
             #self.redraw_canvas()
+
+        self.turret = None
+
+        for idx, turret in enumerate(self.turrets):
+            if turret.detect_cursor(point) and event.num == 1:
+                self.square = None
+                self.turret = turret
 
   #  def on_move_press(self, event):
   #      cur_x = self.canvas.canvasx(event.x)
@@ -278,6 +320,8 @@ class MyApp:
 
 root = Tk()
 #root.attributes("-fullscreen", True)
+root.geometry("{}x{}+0+0".format(DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"], DEFAULT_CONFIG["side"] * (DEFAULT_CONFIG["rows"] + 2)))
+root.resizable(0, 0)
 myapp = MyApp(root)
 #sdfasd
 myapp.create_game()

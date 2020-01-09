@@ -1,5 +1,4 @@
 from math import sqrt
-from PIL import Image, ImageTk
 
 DEFAULT_CONFIG = {"fill": "purple",
                   "side": 80,
@@ -43,6 +42,7 @@ class Build(Square):
         #self.fill_color = "green" if self.can_be_path else "red"
         self.fill_color = DEFAULT_CONFIG["fill"]
         self.path = False
+        self.turret_built = False
 
     def draw(self, canvas):
         return canvas.create_rectangle(self.x, self.y, self.x + self.side, self.y + self.side, fill=self.fill_color,
@@ -60,7 +60,6 @@ class Path(Square):
         self.end = end
         self.path = True
 
-
     def draw(self, canvas):
         return canvas.create_rectangle(self.x, self.y, self.x + self.side, self.y + self.side, fill=self.fill_color,
                                        outline=self.outline_color, width=self.outline_width)
@@ -69,18 +68,103 @@ class Path(Square):
         return True if self.x <= point.x <= self.x + self.side and self.y <= point.y <= self.y + self.side else False
 
 
-class Turret1(Square):
+class Turret(Square):
     def __init__(self, x, y):
         super().__init__(x, y)
+        self.x = x + DEFAULT_CONFIG["side"] / 2
+        self.y = y + DEFAULT_CONFIG["side"] / 2
         self.fill_color = "red"
+        self.damage = 50
+        self.bullet_size = 5
+        self.damage_amp = 2
+        self.level = 1
+        self.range = DEFAULT_CONFIG["side"] * 3
+        self.enemies = []
+        self.in_range = []
 
     def draw(self, canvas):
-        return canvas.create_rectangle(self.x, self.y, self.x + self.side, self.y + self.side, fill=self.fill_color,
-                                       outline=self.outline_color, width=self.outline_width)
+        return canvas.create_oval(self.x - self.side / 4, self.y - self.side / 4, self.x + self.side / 4,
+                                  self.y + self.side / 4, fill="red", outline=self.outline_color, width=5)
+
+    def draw_range(self, canvas):
+        return canvas.create_oval(self.x - self.range, self.y - self.range, self.x + self.range, self.y + self.range, fill="", outline="black", width="5")
 
     def detect_cursor(self, point):
-        return True if self.x <= point.x <= self.x + self.side and self.y <= point.y <= self.y + self.side else False
+        return True if sqrt(pow(self.x - point.x, 2) + pow(self.y - point.y, 2)) < DEFAULT_CONFIG["side"] / 4 else False
 
+    def attack(self):
+        self.in_range = []
+        for enemy in self.enemies:
+            x = enemy.x
+            y = enemy.y
+            dxc = x - self.x
+            dyc = y - self.y
+            dis = sqrt(pow(dxc, 2) + pow(dyc, 2))
+            if dis < self.range:
+                self.in_range.append(enemy)
+        if len(self.in_range) > 0:
+            enemy = self.in_range[0]
+            dxc = enemy.x - self.x
+            dyc = enemy.y - self.y
+
+            if dxc == 0:
+                vel_x = 0
+            else:
+                vel_x = abs(dxc) / dxc if abs(dxc) > abs(dyc) else abs(dxc) / dyc
+            if x - self.x < 0:
+                vel_x *= -1
+
+            if dyc == 0:
+                vel_y = 0
+            else:
+                vel_y = abs(dyc) / dyc if abs(dyc) > abs(dxc) else abs(dyc) / dxc
+            if y - self.y < 0:
+                vel_y *= -1
+
+            bullet = Bullet(self.x, self.y, vel_x, vel_y, self.damage, self.bullet_size)
+            return bullet
+        else:
+            return False
+
+
+class Bullet(Square):
+    def __init__(self, x, y, vel_x, vel_y, damage, side):
+        super.__init__(x, y)
+        self.x = x
+        self.y = y
+        self.fill_color = "black"
+        self.side = side
+        self.speed = 20
+        self.hits = 1
+        self.damage = damage
+        self.destroyed = False
+        self.vel_x = vel_x
+        self.vel_y = vel_y
+        self.enemies = []
+
+    def draw(self, canvas):
+        return canvas.create_oval(self.x - self.side / 2, self.y - self.side / 2, self.x + self.side / 2, self.y + self.side / 2,
+                                  fill=self.fill_color, outline="")
+
+    def move(self):
+        self.x += self.vel_x * self.speed
+        self.y += self.vel_y * self.speed
+
+    def is_destroyed(self):
+        if self.hits < 1:
+            self.destroyed = True
+
+    def hit_enemy(self):
+        for enemy in self.enemies:
+            point = Point(enemy.x, enemy.y)
+            dx = point.x - self.x
+            dy = point.y - self.y
+            dist = sqrt(pow(dx, 2) + pow(dy, 2))
+            if dist < (DEFAULT_CONFIG["enemy_size"] + self.size) / 2 and self.hits > 0:
+                self.hits -= 1
+                self.enemies.remove(enemy)
+                print("Hit appended: {}".format(enemy))
+                self.is_destroyed()
 
 class Enemy(Square):
     def __init__(self, x, y):
@@ -151,7 +235,6 @@ class Enemy(Square):
             self.vel_y *= -1
 
         print("Vel_x: {}, Vel_y: {}".format(self.vel_x, self.vel_y))
-
 
     def set_passed(self):
         for s in self.path:
