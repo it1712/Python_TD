@@ -6,7 +6,6 @@ from objects import *
 from json import dumps
 from ast import literal_eval
 from PIL import Image, ImageTk
-import sched, time
 
 class MyApp:
     def __init__(self, parent):
@@ -142,10 +141,11 @@ class MyApp:
 
     def create_wave(self):
         #root.after(2000, self.create_wave, self)
-        self.current_wave = self.first_wave + self.wave_difference * (self.wave_number - 1)
-        self.phase = "wave"
-        self.create_enemy()
-        self.wave_number += 1
+        if self.phase != "wave":
+            self.current_wave = self.first_wave + self.wave_difference * (self.wave_number - 1)
+            self.phase = "wave"
+            self.create_enemy()
+            self.wave_number += 1
 
     def add_enemy(self):
         if self.phase == "wave":
@@ -164,6 +164,20 @@ class MyApp:
         else:
             self.phase = "shopping"
 
+    def bullet_hit_enemy(self):
+        for bullet in self.bullets:
+            for i, enemy in enumerate(self.enemies):
+
+                point = Point(enemy.x, enemy.y)
+                dx = point.x - bullet.x
+                dy = point.y - bullet.y
+                dist = sqrt(pow(dx, 2) + pow(dy, 2))
+                if dist < (DEFAULT_CONFIG["enemy_size"] + bullet.side) / 2 and bullet.hits > 0:
+                    bullet.hits -= 1
+                    bullet.enemies_hit.append(enemy)
+                    self.enemies[i].hp -= bullet.damage
+                    print("Enemy hit appended: {}\n".format(bullet.enemies_hit))
+
     def loop(self):
         for enemy in self.enemies:
             enemy.set_passed()
@@ -173,6 +187,8 @@ class MyApp:
             if enemy.reached_end():
                 self.hp -= 1
                 self.enemies.remove(enemy)
+        #if len(self.enemies) == 0:
+        #    self.phase = "shopping"
         for bullet in self.bullets:
             bullet.enemies = self.enemies
             bullet.move()

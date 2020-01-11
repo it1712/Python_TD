@@ -1,4 +1,5 @@
 from math import sqrt
+from threading import Timer
 
 DEFAULT_CONFIG = {"fill": "purple",
                   "side": 80,
@@ -78,6 +79,8 @@ class Turret(Square):
         self.bullet_size = 5
         self.damage_amp = 2
         self.level = 1
+        self.loaded = 1
+        self.load_time = 1
         self.range = DEFAULT_CONFIG["side"] * 3
         self.enemies = []
         self.in_range = []
@@ -92,39 +95,45 @@ class Turret(Square):
     def detect_cursor(self, point):
         return True if sqrt(pow(self.x - point.x, 2) + pow(self.y - point.y, 2)) < DEFAULT_CONFIG["side"] / 4 else False
 
+    def reload(self):
+        self.loaded = 1
+
     def attack(self):
-        self.in_range = []
-        for enemy in self.enemies:
-            x = enemy.x
-            y = enemy.y
-            dxc = x - self.x
-            dyc = y - self.y
-            dis = sqrt(pow(dxc, 2) + pow(dyc, 2))
-            if dis < self.range:
-                self.in_range.append(enemy)
-        if len(self.in_range) > 0:
-            enemy = self.in_range[0]
-            dxc = enemy.x - self.x
-            dyc = enemy.y - self.y
+        if self.loaded == 1:
+            self.loaded = 0
+            t = Timer(self.load_time, self.reload)
+            t.start()
+            self.in_range = []
+            for enemy in self.enemies:
+                x = enemy.x
+                y = enemy.y
+                dxc = x - self.x
+                dyc = y - self.y
+                dis = sqrt(pow(dxc, 2) + pow(dyc, 2))
+                if dis < self.range:
+                    self.in_range.append(enemy)
+            if len(self.in_range) > 0:
+                enemy = self.in_range[0]
+                dxc = enemy.x - self.x
+                dyc = enemy.y - self.y
 
-            if dxc == 0:
-                vel_x = 0
-            else:
-                vel_x = abs(dxc) / dxc if abs(dxc) > abs(dyc) else abs(dxc) / dyc
-            if x - self.x < 0:
-                vel_x *= -1
+                if dxc == 0:
+                    vel_x = 0
+                else:
+                    vel_x = abs(dxc) / dxc if abs(dxc) > abs(dyc) else abs(dxc) / dyc
+                if x - self.x < 0:
+                    vel_x *= -1
 
-            if dyc == 0:
-                vel_y = 0
-            else:
-                vel_y = abs(dyc) / dyc if abs(dyc) > abs(dxc) else abs(dyc) / dxc
-            if y - self.y < 0:
-                vel_y *= -1
+                if dyc == 0:
+                    vel_y = 0
+                else:
+                    vel_y = abs(dyc) / dyc if abs(dyc) > abs(dxc) else abs(dyc) / dxc
+                if y - self.y < 0:
+                    vel_y *= -1
 
-            bullet = Bullet(self.x, self.y, vel_x, vel_y, self.damage, self.bullet_size)
-            return bullet
-        else:
-            return False
+                bullet = Bullet(self.x, self.y, vel_x, vel_y, self.damage, self.bullet_size)
+                return bullet
+        return False
 
 
 class Bullet(Square):
@@ -140,8 +149,12 @@ class Bullet(Square):
         self.destroyed = False
         self.vel_x = vel_x
         self.vel_y = vel_y
-        self.enemies = []
-        #MAYBE UDĚLEJ V GAME.PY AŤ SE NEMUSÍ FURT NĚJAK VKLÁDAT self.enemies KVŮLI HODNOTÁM x A y.. Attack taky
+        self.enemies_hit = []
+        #MAYBE UDĚLEJ V GAME.PY AŤ SE NEMUSÍ FURT NĚJAK VKLÁDAT self.enemies KVŮLI HODNOTÁM x A y.. Attack taky ... Něco jako pointer nešlo -_-
+        # bullet propočítání hitu - done
+        # attack - dodělat, jak přijdeš!!!
+        # ještě tamto jsi chtěl
+
     def draw(self, canvas):
         return canvas.create_oval(self.x - self.side / 2, self.y - self.side / 2, self.x + self.side / 2, self.y + self.side / 2,
                                   fill=self.fill_color, outline="")
@@ -154,29 +167,35 @@ class Bullet(Square):
         if self.hits < 1:
             self.destroyed = True
 
+
+"""
+                        moc to zatěžovalo...
     def hit_enemy(self):
         for enemy in self.enemies:
             point = Point(enemy.x, enemy.y)
             dx = point.x - self.x
             dy = point.y - self.y
             dist = sqrt(pow(dx, 2) + pow(dy, 2))
-            if dist < (DEFAULT_CONFIG["enemy_size"] + self.size) / 2 and self.hits > 0:
+            if dist < (DEFAULT_CONFIG["enemy_size"] + self.side) / 2 and self.hits > 0:
                 self.hits -= 1
                 self.enemies.remove(enemy)
                 print("Hit appended: {}".format(enemy))
                 self.is_destroyed()
+"""
+
 
 class Enemy(Square):
     def __init__(self, x, y):
         super().__init__(x, y)
         self.hp = 100
-        self.speed = 5
+        self.speed = 0.5
         self.vel_x = 1
         self.vel_y = 0
         self.fill_color = "orange"
         self.side = DEFAULT_CONFIG["enemy_size"]
         self.path = []
         self.img = None
+        self.reward = 100
         self.img_side = self.side / (2 * sqrt(2))
 
     def draw(self, canvas):
