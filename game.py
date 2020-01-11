@@ -22,6 +22,7 @@ class MyApp:
         self.current_wave = self.first_wave
         self.wave_number = 1
         #self.template = [[1]*DEFAULT_CONFIG["cols"]]*DEFAULT_CONFIG["rows"]
+        #tvorba mapy (templatu) - asi nestíhám, bo x == 0 -_-
         self.template = [
             [1,1,1,1,1,1,1,1,1,1],
             [3,2,2,1,1,2,2,2,1,1],
@@ -44,16 +45,21 @@ class MyApp:
         self.enemy_start_x = None
         self.enemy_start_y = None
         self.hp = 5
-        self.money = 500
+        self.money = 0
         self.image = Image.open("image.jpg")
         self.image = self.image.resize((int(DEFAULT_CONFIG["enemy_size"] / sqrt(2)), int(DEFAULT_CONFIG["enemy_size"] / sqrt(2))), Image.ANTIALIAS)
         self.img = ImageTk.PhotoImage(self.image)
+        self.image = Image.open("image.jpg")
+        self.image = self.image.resize((DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"], DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["rows"]), Image.ANTIALIAS)
+        self.endimg = ImageTk.PhotoImage(self.image)
         self.file = None
         self.breakloop = False
         self.turrets = []
         self.turret = None
         self.bullets = []
         self.bullet = None
+        self.delay_between_spawn = 2000
+        self.auto_wave = False
 
     def set_default(self):
         self.bullets = []
@@ -69,39 +75,35 @@ class MyApp:
         self.squares = []
         self.square = None
         self.current_wave = 0
-        self.wave_number = 1
+        self.wave_number = 0
         self.start_x = 0
         self.start_y = 0
         self.x = 0
         self.y = DEFAULT_CONFIG["side"]
         self.phase = "shopping"
         self.breakloop = False
+        self.delay_between_spawn = 2000
+        self.auto_wave = False
 
     def drawWidgets(self):
         screen_width = self.parent.winfo_screenwidth()
         screen_height = self.parent.winfo_screenheight()
-        self.container = Frame(self.parent, width=DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"], height=169999, bg="gray")
+        self.container = Frame(self.parent, width=DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"], height=1000, bg="gray")
         self.canvas = Canvas(self.parent, width=DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"], height=DEFAULT_CONFIG["side"] * (DEFAULT_CONFIG["rows"] + 1), bg=self.color_bg)
         self.canvas.pack(fill=BOTH, expand=True)
         self.canvas.bind("<ButtonPress-1>", self.on_button_press)
         self.canvas.bind("<ButtonPress-3>", self.on_button_press)
-        #self.canvas.bind("<ButtonRelease-1>", self.on_button_release)
-        #self.canvas.bind("<B1-Motion>", self.on_move_press)
-
-
-        #Vybrat věž, do proměnné self.currentturretasivole -> vybranou turretu -> podle toho vybrat
-        #Hlavně pak udělat nahrazení v self.squares na správné pozici
-        button_rectangle = Button(self.container, text="Turret 1", command=self.turret_add)
+        button_rectangle = Button(self.container, text="Turret Big (100$)", command=self.turret_add_big)
         button_rectangle.pack(side=LEFT)
-        button_rectangle = Button(self.container, text="Turret 2", command=self.p)
+        button_rectangle = Button(self.container, text="Turret Fast (100$)", command=self.turret_add_fast)
         button_rectangle.pack(side=LEFT)
-        button_rectangle = Button(self.container, text="add", command=self.add_enemy)
+        button_rectangle = Button(self.container, text="Další vlna", command=self.create_wave)
         button_rectangle.pack(side=LEFT)
-        button_rectangle = Button(self.container, text="Next wave", command=self.create_wave)
+        button_rectangle = Button(self.container, text="Další vlna automaticky", command=self.auto_new_wave)
         button_rectangle.pack(side=LEFT)
-        button_rectangle = Button(self.container, text="Prodat", command=self.p)
+        button_rectangle = Button(self.container, text="Prodat", command=self.turret_sell)
         button_rectangle.pack(side=RIGHT)
-        button_rectangle = Button(self.container, text="Vylepšit", command=self.p)
+        button_rectangle = Button(self.container, text="Vylepšit", command=self.turret_upgrade)
         button_rectangle.pack(side=RIGHT)
         self.container.pack(fill=BOTH)
 
@@ -118,8 +120,8 @@ class MyApp:
         filemenu.add_command(label='Uložit herní pole', command=self.save_template)
         filemenu.add_command(label='Načíst herní pole', command=self.load_template)
 
-    def p(self):
-        pass
+    def auto_new_wave(self):
+        self.auto_wave = True if not self.auto_wave else False
 
     def load_template(self):
         self.breakloop = True
@@ -142,25 +144,27 @@ class MyApp:
     def create_wave(self):
         #root.after(2000, self.create_wave, self)
         if self.phase != "wave":
+            self.wave_number += 1
             self.current_wave = self.first_wave + self.wave_difference * (self.wave_number - 1)
             self.phase = "wave"
-            self.create_enemy()
-            self.wave_number += 1
+            self.bullets.clear()
+            self.create_enemy(100 + 50 * (self.wave_number - 1), 1 + 0.5 * (self.wave_number - 1))
 
-    def add_enemy(self):
+    def add_enemy(self, hp, speed):
         if self.phase == "wave":
-            self.enemy = Enemy(self.enemy_start_x, self.enemy_start_y)
+            self.enemy = Enemy(self.enemy_start_x, self.enemy_start_y, hp, speed)
             self.enemy.img = self.img
             for square in self.squares:
                 if square.path:
                     self.enemy.path.append(square)
-            self.enemies.insert(0,self.enemy)
-            self.create_enemy()
+            self.enemies.insert(0, self.enemy)
+            self.create_enemy(hp, speed)
 
-    def create_enemy(self):
+    def create_enemy(self, hp, speed):
         if self.current_wave > 0:
             self.current_wave -= 1
-            root.after(2000, self.add_enemy)
+            self.delay_between_spawn -= self.delay_between_spawn / 100
+            root.after(int(self.delay_between_spawn), self.add_enemy, hp, speed)
         else:
             self.phase = "shopping"
 
@@ -182,7 +186,7 @@ class MyApp:
     def turret_attack(self, turret):
         if turret.loaded == 1:
             turret.loaded = 0
-            root.after(turret.load_time * 1000, turret.reload)
+            root.after(int(turret.load_time), turret.reload)
             turret.in_range = []
             for enemy in self.enemies[::-1]:
                 x = enemy.x
@@ -194,24 +198,25 @@ class MyApp:
                     turret.in_range.append(enemy)
             if len(turret.in_range) > 0:
                 enemy = turret.in_range[0]
-                dxc = turret.x - enemy.x
-                dyc = turret.y - enemy.y
+
+                dxc = abs(enemy.x - turret.x)
+                dyc = abs(enemy.y - turret.y)
 
                 if dxc == 0:
                     vel_x = 0
                 else:
-                    vel_x = abs(dxc) / dxc if abs(dxc) > abs(dyc) else abs(dxc) / dyc
-                if x - turret.x < 0:
+                    vel_x = dxc / dxc if dxc > dyc else dxc / dyc
+                if enemy.x - turret.x < 0:
                     vel_x *= -1
 
                 if dyc == 0:
                     vel_y = 0
                 else:
-                    vel_y = abs(dyc) / dyc if abs(dyc) > abs(dxc) else abs(dyc) / dxc
-                if y - turret.y < 0:
+                    vel_y = dyc / dyc if dyc > dxc else dyc / dxc
+                if enemy.y - turret.y < 0:
                     vel_y *= -1
 
-                self.bullet = Bullet(turret.x, turret.y, vel_x, vel_y, turret.damage, turret.bullet_size)
+                self.bullet = Bullet(turret.x, turret.y, vel_x, vel_y, turret.damage, turret.bullet_size, turret.bullet_hits)
         else:
             self.bullet = None
 
@@ -221,11 +226,13 @@ class MyApp:
             enemy.move()
             if enemy.dead():
                 self.enemies.remove(enemy)
+                self.money += enemy.reward
             if enemy.reached_end():
                 self.hp -= 1
                 self.enemies.remove(enemy)
-        #if len(self.enemies) == 0:
-        #    self.phase = "shopping"
+        if len(self.enemies) == 0 and self.auto_wave:
+            self.create_wave()
+            #self.phase = "shopping"
 
         for turret in self.turrets:
             self.turret_attack(turret)
@@ -235,7 +242,8 @@ class MyApp:
             bullet.move()
             bullet.is_destroyed()
             self.bullet_hit_enemy(bullet)
-            if bullet.x < 0 or bullet.y < DEFAULT_CONFIG["side"] or bullet.x > self.width or bullet.y > DEFAULT_CONFIG["side"] * (DEFAULT_CONFIG["rows"] + 1) or bullet.destroyed:
+            bullet.is_destroyed()
+            if bullet.destroyed:
                 self.bullets.remove(bullet)
                 print(self.bullets)
         self.redraw_canvas()
@@ -257,10 +265,23 @@ class MyApp:
             enemy.draw(self.canvas)
         for turret in self.turrets:
             turret.draw(self.canvas)
+            #self.canvas.create_text(turret.x - turret.side / 2 + 5, turret.y + turret.side / 2, fill="black", font="arial 12",
+            #                   text="{}".format(turret.level), anchor=SW)
         for bullet in self.bullets:
             bullet.draw(self.canvas)
         if self.turret:
             self.turret.draw_range(self.canvas)
+            self.canvas.create_text(DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"] - 10, DEFAULT_CONFIG["side"] * (DEFAULT_CONFIG["rows"] + 1) + 10,
+                                    fill="black", font="arial 15", text="Vylepšit za {}$   Prodat za {}$".format(self.turret.cost * 2, self.turret.total_cost / 2), anchor=NE)
+        self.canvas.create_text((DEFAULT_CONFIG["side"]*DEFAULT_CONFIG["cols"] - 10), DEFAULT_CONFIG["side"] / 2,
+                                fill="yellow", font="times 30 italic bold", text="{}$".format(self.money), anchor=E)
+        self.canvas.create_text(10, DEFAULT_CONFIG["side"] / 2, fill="black", font="arial 30",
+                                text="Wave: {}".format(self.wave_number), anchor=W)
+        self.canvas.create_text(DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"] / 2, DEFAULT_CONFIG["side"] / 2,
+                                fill="red", font="arial 30", text="{}".format("♥" * self.hp))
+        self.canvas.create_text(10, DEFAULT_CONFIG["side"] * (DEFAULT_CONFIG["rows"] + 1) + 10,
+                                fill="black", font="arial 15", anchor=NW,
+                                text="Další vlna automaticky - {}".format("ON" if self.auto_wave else "OFF"))
         print("Překreslit canvas")
 
     def create_game(self):
@@ -292,19 +313,48 @@ class MyApp:
 
     def end_game_dialog(self):
         print("Konec hry")
+        self.canvas.create_image(DEFAULT_CONFIG["side"] * 5, DEFAULT_CONFIG["side"] * 6, image=self.endimg)
         if askyesno('Konec hry', 'Chcete začít novou hru?'):
             self.create_game()
             print("_____________NEW GAME_____________")
         else:
             self.parent.destroy()
 
-    def turret_add(self):
+    def turret_add_big(self):
+        self.turret_add("big")
+
+    def turret_add_fast(self):
+        self.turret_add("fast")
+
+    def turret_add(self, type):
         if self.square and not self.square.path:
             if not self.square.turret_built:
-                self.turret = Turret(self.square.x, self.square.y)
+                if type == "big":
+                    self.turret = TurretBig(self.square.x, self.square.y)
+                elif type == "fast":
+                    self.turret = TurretFast(self.square.x, self.square.y)
+                if self.money >= self.turret.cost:
+                    self.money -= self.turret.cost
+                    self.turrets.append(self.turret)
+                    self.square.turret_built = True
+                    print(self.turrets)
+                else:
+                    self.turret = None
+
+    def turret_sell(self):
+        if self.turret:
+            self.turrets.remove(self.turret)
+            self.money += int(self.turret.total_cost / 2)
+            self.square.turret_built = False
+            self.turret = None
+
+    def turret_upgrade(self):
+        if self.turret:
+            if self.money >= 2 * self.turret.cost:
+                self.money -= int(2 * self.turret.cost)
+                self.turrets.remove(self.turret)
+                self.turret.upgrade()
                 self.turrets.append(self.turret)
-                self.square.turret_built = True
-                print(self.turrets)
 
     def on_button_press(self, event):
         self.start_x = self.canvas.canvasx(event.x)
@@ -334,43 +384,7 @@ class MyApp:
 
         for idx, turret in enumerate(self.turrets):
             if turret.detect_cursor(point) and event.num == 1:
-                self.square = None
                 self.turret = turret
-
-  #  def on_move_press(self, event):
-  #      cur_x = self.canvas.canvasx(event.x)
-   #     cur_y = self.canvas.canvasy(event.y)
-  #      if self.phase == "build":
- #           pass
-#
-#        if (self.action == "new"):
-#            self.square.x = self.start_x if self.start_x <= cur_x else cur_x
-#            self.square.y = self.start_y if self.start_y <= cur_y else cur_y
-#            self.square.width = abs(self.start_x - cur_x)
-#            self.square.height = abs(self.start_y - cur_y)
-#
-#       if (self.action == "edit"):
-#            self.square.x = cur_x - self.start_x + self.old_x
-#            self.square.y = cur_y - self.start_y + self.old_y
-#
-#        if event.state & 0x00001 and self.square:
-#            print('SHIFT')
-#
-#        if event.state & 0x00004 and (self.action == "edit"):
-#            print('CTRL')
-#
-#        if event.state & 0x20000:
-#            print('ALT')
-#
-#        self.redraw_canvas()
-#        print("Tažení myši nad plátnem (drag)")
-
-    # def on_ctrl_move_press(self, event):
-    #     print("Tažení myši nad plátnem (drag) + CTRL")
-
-#    def on_button_release(self, event):
-#        self.action = ""
-#        print("Uvolnění tlačítka myši nad plátnem (drop)")
 
 
 root = Tk()

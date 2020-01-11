@@ -44,6 +44,9 @@ class Build(Square):
         self.path = False
         self.turret_built = False
 
+    def __repr__(self):
+        return "Build_square(x: {}, y: {})".format(self.x, self.y)
+
     def draw(self, canvas):
         return canvas.create_rectangle(self.x, self.y, self.x + self.side, self.y + self.side, fill=self.fill_color,
                                        outline=self.outline_color, width=self.outline_width)
@@ -60,8 +63,11 @@ class Path(Square):
         self.end = end
         self.path = True
 
+    def __repr__(self):
+        return "Path_square(x: {}, y: {},)".format(self.x, self.y)
+
     def draw(self, canvas):
-        return canvas.create_rectangle(self.x, self.y, self.x + self.side, self.y + self.side, fill=self.fill_color,
+        canvas.create_rectangle(self.x, self.y, self.x + self.side, self.y + self.side, fill=self.fill_color,
                                        outline=self.outline_color, width=self.outline_width)
 
     def detect_cursor(self, point):
@@ -74,21 +80,35 @@ class Turret(Square):
         self.x = x + DEFAULT_CONFIG["side"] / 2
         self.y = y + DEFAULT_CONFIG["side"] / 2
         self.fill_color = "red"
+        self.def_cost = 100
+        self.cost = self.def_cost
+        self.total_cost = self.def_cost
         self.damage = 50
         self.bullet_size = 5
-        self.damage_amp = 2
+        self.bullet_max_size = DEFAULT_CONFIG["side"]
+        self.bullet_hits = 1
+        self.damage_amp = 1.2
         self.level = 1
         self.loaded = 1
-        self.load_time = 1
+        self.load_time = 1000
+        self.min_load_time = 100
+        self.load_time_diff = 100
         self.range = DEFAULT_CONFIG["side"] * 3
         self.in_range = []
+        self.fill_color = "white"
+
+    def __repr__(self):
+        return "Turret(x: {}, y: {})".format(self.x, self.y)
 
     def draw(self, canvas):
-        return canvas.create_oval(self.x - self.side / 4, self.y - self.side / 4, self.x + self.side / 4,
-                                  self.y + self.side / 4, fill="red", outline=self.outline_color, width=5)
+        canvas.create_oval(self.x - self.side / 4, self.y - self.side / 4, self.x + self.side / 4,
+                           self.y + self.side / 4, fill=self.fill_color, outline=self.outline_color, width=5)
+        canvas.create_text(self.x, self.y, fill="black", font="arial 10",
+                           text="{}".format(self.level))
 
     def draw_range(self, canvas):
-        return canvas.create_oval(self.x - self.range, self.y - self.range, self.x + self.range, self.y + self.range, fill="", outline="black", width="5")
+        canvas.create_oval(self.x - self.range, self.y - self.range, self.x + self.range, self.y + self.range,
+                                  fill="", outline="black", width="5")
 
     def detect_cursor(self, point):
         return True if sqrt(pow(self.x - point.x, 2) + pow(self.y - point.y, 2)) < DEFAULT_CONFIG["side"] / 4 else False
@@ -96,66 +116,86 @@ class Turret(Square):
     def reload(self):
         self.loaded = 1
 
-"""
-    def attack(self):
-        if self.loaded == 1:
-            self.loaded = 0
-            t = Timer(self.load_time, self.reload)
-            t.start()
-            self.in_range = []
-            for enemy in self.enemies:
-                x = enemy.x
-                y = enemy.y
-                dxc = x - self.x
-                dyc = y - self.y
-                dis = sqrt(pow(dxc, 2) + pow(dyc, 2))
-                if dis < self.range:
-                    self.in_range.append(enemy)
-            if len(self.in_range) > 0:
-                enemy = self.in_range[0]
-                dxc = enemy.x - self.x
-                dyc = enemy.y - self.y
+    def upgrade(self):
+        self.cost *= 2
+        self.total_cost += self.cost
+        self.level += 1
+        self.damage *= self.damage_amp
+        if self.bullet_size > self.bullet_max_size:
+            self.bullet_size = self.bullet_max_size
+        else:
+            self.bullet_size *= self.damage_amp
+        self.bullet_hits += 1
 
-                if dxc == 0:
-                    vel_x = 0
-                else:
-                    vel_x = abs(dxc) / dxc if abs(dxc) > abs(dyc) else abs(dxc) / dyc
-                if x - self.x < 0:
-                    vel_x *= -1
 
-                if dyc == 0:
-                    vel_y = 0
-                else:
-                    vel_y = abs(dyc) / dyc if abs(dyc) > abs(dxc) else abs(dyc) / dxc
-                if y - self.y < 0:
-                    vel_y *= -1
+class TurretBig(Turret):
+    def __init__(self, x, y):
+        super().__init__(x, y)
+        self.x = x + DEFAULT_CONFIG["side"] / 2
+        self.y = y + DEFAULT_CONFIG["side"] / 2
+        self.fill_color = "red"
+        self.type = "big"
+        self.load_time = 2000
+        self.size_amp = self.damage_amp
+        self.damage_amp = 2
 
-                bullet = Bullet(self.x, self.y, vel_x, vel_y, self.damage, self.bullet_size)
-                return bullet
-        return False
-"""
+    def __repr__(self):
+        return "Turret_Big(x: {}, y: {}, bullet_size: {}, damage: {} )".format(self.x, self.y, self.bullet_size, self.damage)
+
+    def upgrade(self):
+        self.cost *= 2
+        self.total_cost += self.cost
+        self.level += 1
+        self.damage *= self.damage_amp
+        if self.bullet_size > self.bullet_max_size:
+            self.bullet_size = self.bullet_max_size
+        else:
+            self.bullet_size *= self.size_amp
+        self.bullet_hits += 1
+
+
+class TurretFast(Turret):
+    def __init__(self, x, y):
+        super().__init__(x, y)
+        self.x = x + DEFAULT_CONFIG["side"] / 2
+        self.y = y + DEFAULT_CONFIG["side"] / 2
+        self.fill_color = "green"
+        self.type = "fast"
+
+    def __repr__(self):
+        return "Turret_Big(x: {}, y: {}, load_time: {}, damage: {} )".format(self.x, self.y, self.load_time, self.damage)
+
+    def upgrade(self):
+        self.cost *= 2
+        self.total_cost += self.cost
+        self.level += 1
+        self.damage *= self.damage_amp
+        if self.load_time < self.min_load_time:
+            self.load_time = self.min_load_time
+        else:
+            self.load_time -= self.load_time_diff
+        self.bullet_hits += 1
 
 
 class Bullet(Square):
-    def __init__(self, x, y, vel_x, vel_y, damage, side):
+    def __init__(self, x, y, vel_x, vel_y, damage, side, hits):
         self.x = x
         self.y = y
         self.fill_color = "black"
         self.side = side
         self.speed = 20
-        self.hits = 1
+        self.hits = hits
         self.damage = damage
         self.destroyed = False
         self.vel_x = vel_x
         self.vel_y = vel_y
         self.enemies_hit = []
-        #MAYBE UDĚLEJ V GAME.PY AŤ SE NEMUSÍ FURT NĚJAK VKLÁDAT self.enemies KVŮLI HODNOTÁM x A y.. Attack taky ... Něco jako pointer nešlo -_-
-        # bullet propočítání hitu - done
-        # attack - dodělat, jak přijdeš!!!
-        # ještě tamto jsi chtěl
+
+    def __repr__(self):
+        return "Bullet(x: {}, y: {}, bullet_size: {}, damage: {}, hits: {})".format(self.x, self.y, self.side, self.damage, self.hits)
 
     def draw(self, canvas):
-        return canvas.create_oval(self.x - self.side / 2, self.y - self.side / 2, self.x + self.side / 2, self.y + self.side / 2,
+        canvas.create_oval(self.x - self.side / 2, self.y - self.side / 2, self.x + self.side / 2, self.y + self.side / 2,
                                   fill=self.fill_color, outline="")
 
     def move(self):
@@ -163,45 +203,29 @@ class Bullet(Square):
         self.y += self.vel_y * self.speed
 
     def is_destroyed(self):
-        if self.hits < 1:
+        if self.x < 0 or self.y < DEFAULT_CONFIG["side"] or self.x > DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"] or self.y > DEFAULT_CONFIG["side"] * (DEFAULT_CONFIG["rows"] + 1) or self.hits < 1:
             self.destroyed = True
 
 
-"""
-                        moc to zatěžovalo...
-    def hit_enemy(self):
-        for enemy in self.enemies:
-            point = Point(enemy.x, enemy.y)
-            dx = point.x - self.x
-            dy = point.y - self.y
-            dist = sqrt(pow(dx, 2) + pow(dy, 2))
-            if dist < (DEFAULT_CONFIG["enemy_size"] + self.side) / 2 and self.hits > 0:
-                self.hits -= 1
-                self.enemies.remove(enemy)
-                print("Hit appended: {}".format(enemy))
-                self.is_destroyed()
-"""
-
-
 class Enemy(Square):
-    def __init__(self, x, y):
+    def __init__(self, x, y, hp=100, speed=1):
         super().__init__(x, y)
-        self.hp = 100
-        self.speed = 5
+        self.hp = hp
+        self.speed = speed if speed <= 35 else 35
         self.vel_x = 1
         self.vel_y = 0
         self.fill_color = "orange"
         self.side = DEFAULT_CONFIG["enemy_size"]
         self.path = []
         self.img = None
-        self.reward = 100
-        self.img_side = self.side / (2 * sqrt(2))
+        self.reward = int((self.hp * self.speed) / 20)
+
+    def __repr__(self):
+        return "Enemy(x: {}, y: {}, hp: {}, speed: {} )".format(self.x, self.y, self.hp, self.speed)
 
     def draw(self, canvas):
         canvas.create_oval(self.x - self.side / 2, self.y - self.side / 2, self.x + self.side / 2, self.y + self.side / 2, fill=self.fill_color, outline=self.outline_color, width=self.outline_width)
-        canvas.create_image(self.x , self.y , image=self.img)
-        #canvas.create_image
-        return True
+        canvas.create_image(self.x, self.y, image=self.img)
 
     def move(self):
         self.x += self.vel_x * self.speed
@@ -216,9 +240,6 @@ class Enemy(Square):
             print(point.x)
             print(point.y)
             print("--")
-#dxc = distance - x - closest(point)
-#dx = distance - x
-#dist = distance po pyt. větě (dist_closest... logicky)
 
             dxc = closest_point.x - self.x
             dyc = closest_point.y - self.y
@@ -241,14 +262,14 @@ class Enemy(Square):
         if dxc == 0:
             self.vel_x = 0
         else:
-            self.vel_x = abs(dxc) / dxc if abs(dxc) > abs(dyc) else abs(dxc) / dyc
+            self.vel_x = dxc / dxc if dxc > dyc else dxc / dyc
         if closest_point.x - self.x < 0:
             self.vel_x *= -1
 
         if dyc == 0:
             self.vel_y = 0
         else:
-            self.vel_y = abs(dyc) / dyc if abs(dyc) > abs(dxc) else abs(dyc) / dxc
+            self.vel_y = dyc / dyc if dyc > dxc else dyc / dxc
         if closest_point.y - self.y < 0:
             self.vel_y *= -1
 
