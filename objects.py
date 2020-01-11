@@ -1,5 +1,4 @@
 from math import sqrt
-from threading import Timer
 
 DEFAULT_CONFIG = {"fill": "purple",
                   "side": 80,
@@ -10,7 +9,7 @@ DEFAULT_CONFIG = {"fill": "purple",
                   "enemy_size":40}
 
 
-class Point():
+class Point:
     def __init__(self, x, y):
         self.x = float(x)
         self.y = float(y)
@@ -20,7 +19,7 @@ class Point():
     def getY(self): return self.y
 
 
-class Square():
+class Square:
     def __init__(self, x, y):
         self.x = x
         self.y = y
@@ -82,7 +81,6 @@ class Turret(Square):
         self.loaded = 1
         self.load_time = 1
         self.range = DEFAULT_CONFIG["side"] * 3
-        self.enemies = []
         self.in_range = []
 
     def draw(self, canvas):
@@ -98,6 +96,7 @@ class Turret(Square):
     def reload(self):
         self.loaded = 1
 
+"""
     def attack(self):
         if self.loaded == 1:
             self.loaded = 0
@@ -134,11 +133,11 @@ class Turret(Square):
                 bullet = Bullet(self.x, self.y, vel_x, vel_y, self.damage, self.bullet_size)
                 return bullet
         return False
+"""
 
 
 class Bullet(Square):
     def __init__(self, x, y, vel_x, vel_y, damage, side):
-        super.__init__(x, y)
         self.x = x
         self.y = y
         self.fill_color = "black"
@@ -188,7 +187,7 @@ class Enemy(Square):
     def __init__(self, x, y):
         super().__init__(x, y)
         self.hp = 100
-        self.speed = 0.5
+        self.speed = 5
         self.vel_x = 1
         self.vel_y = 0
         self.fill_color = "orange"

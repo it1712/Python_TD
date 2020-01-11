@@ -164,19 +164,56 @@ class MyApp:
         else:
             self.phase = "shopping"
 
-    def bullet_hit_enemy(self):
-        for bullet in self.bullets:
-            for i, enemy in enumerate(self.enemies):
+    def bullet_hit_enemy(self, bullet):
+        for i, enemy in enumerate(self.enemies):
 
-                point = Point(enemy.x, enemy.y)
-                dx = point.x - bullet.x
-                dy = point.y - bullet.y
-                dist = sqrt(pow(dx, 2) + pow(dy, 2))
-                if dist < (DEFAULT_CONFIG["enemy_size"] + bullet.side) / 2 and bullet.hits > 0:
-                    bullet.hits -= 1
-                    bullet.enemies_hit.append(enemy)
-                    self.enemies[i].hp -= bullet.damage
-                    print("Enemy hit appended: {}\n".format(bullet.enemies_hit))
+            point = Point(enemy.x, enemy.y)
+            dx = point.x - bullet.x
+            dy = point.y - bullet.y
+            dist = sqrt(pow(dx, 2) + pow(dy, 2))
+            if dist < (DEFAULT_CONFIG["enemy_size"] + bullet.side) / 2 and bullet.hits > 0:
+                bullet.hits -= 1
+                print(bullet.hits)
+                print("\n\n\n\n\n")
+                bullet.enemies_hit.append(enemy)
+                self.enemies[i].hp -= bullet.damage
+                print("Enemy hit appended: {}\n".format(bullet.enemies_hit))
+
+    def turret_attack(self, turret):
+        if turret.loaded == 1:
+            turret.loaded = 0
+            root.after(turret.load_time * 1000, turret.reload)
+            turret.in_range = []
+            for enemy in self.enemies[::-1]:
+                x = enemy.x
+                y = enemy.y
+                dxc = x - turret.x
+                dyc = y - turret.y
+                dis = sqrt(pow(dxc, 2) + pow(dyc, 2))
+                if dis < turret.range:
+                    turret.in_range.append(enemy)
+            if len(turret.in_range) > 0:
+                enemy = turret.in_range[0]
+                dxc = turret.x - enemy.x
+                dyc = turret.y - enemy.y
+
+                if dxc == 0:
+                    vel_x = 0
+                else:
+                    vel_x = abs(dxc) / dxc if abs(dxc) > abs(dyc) else abs(dxc) / dyc
+                if x - turret.x < 0:
+                    vel_x *= -1
+
+                if dyc == 0:
+                    vel_y = 0
+                else:
+                    vel_y = abs(dyc) / dyc if abs(dyc) > abs(dxc) else abs(dyc) / dxc
+                if y - turret.y < 0:
+                    vel_y *= -1
+
+                self.bullet = Bullet(turret.x, turret.y, vel_x, vel_y, turret.damage, turret.bullet_size)
+        else:
+            self.bullet = None
 
     def loop(self):
         for enemy in self.enemies:
@@ -189,12 +226,18 @@ class MyApp:
                 self.enemies.remove(enemy)
         #if len(self.enemies) == 0:
         #    self.phase = "shopping"
+
+        for turret in self.turrets:
+            self.turret_attack(turret)
+            if self.bullet:
+                self.bullets.append(self.bullet)
         for bullet in self.bullets:
-            bullet.enemies = self.enemies
             bullet.move()
-            bullet.hit_enemy()
+            bullet.is_destroyed()
+            self.bullet_hit_enemy(bullet)
             if bullet.x < 0 or bullet.y < DEFAULT_CONFIG["side"] or bullet.x > self.width or bullet.y > DEFAULT_CONFIG["side"] * (DEFAULT_CONFIG["rows"] + 1) or bullet.destroyed:
                 self.bullets.remove(bullet)
+                print(self.bullets)
         self.redraw_canvas()
         if self.hp > 0:
             if not self.breakloop:
@@ -259,10 +302,6 @@ class MyApp:
         if self.square and not self.square.path:
             if not self.square.turret_built:
                 self.turret = Turret(self.square.x, self.square.y)
-                self.turret.enemies = self.enemies
-                self.bullet = self.turret.attack()
-                if self.bullet:
-                    self.bullets.append(self.bullet)
                 self.turrets.append(self.turret)
                 self.square.turret_built = True
                 print(self.turrets)
