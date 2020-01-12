@@ -97,13 +97,15 @@ class MyApp:
         button_rectangle.pack(side=LEFT)
         button_rectangle = Button(self.container, text="Turret Fast (100$)", command=self.turret_add_fast)
         button_rectangle.pack(side=LEFT)
-        button_rectangle = Button(self.container, text="Další vlna", command=self.create_wave)
-        button_rectangle.pack(side=LEFT)
-        button_rectangle = Button(self.container, text="Další vlna automaticky", command=self.auto_new_wave)
-        button_rectangle.pack(side=LEFT)
         button_rectangle = Button(self.container, text="Prodat", command=self.turret_sell)
         button_rectangle.pack(side=RIGHT)
         button_rectangle = Button(self.container, text="Vylepšit", command=self.turret_upgrade)
+        button_rectangle.pack(side=RIGHT)
+        button_rectangle = Button(self.container, text="Další vlna automaticky", command=self.auto_new_wave)
+        button_rectangle.pack(side=RIGHT)
+        button_rectangle = Button(self.container, text="Další vlna", command=self.create_wave)
+        button_rectangle.pack(side=RIGHT)
+        button_rectangle = Button(self.container, text="Target mode", command=self.change_target_mode)
         button_rectangle.pack(side=RIGHT)
         self.container.pack(fill=BOTH)
 
@@ -148,7 +150,11 @@ class MyApp:
             self.current_wave = self.first_wave + self.wave_difference * (self.wave_number - 1)
             self.phase = "wave"
             self.bullets.clear()
-            self.create_enemy(100 + 50 * (self.wave_number - 1), 1 + 0.5 * (self.wave_number - 1))
+            hp = 100 + 50 * (self.wave_number - 1)
+            speed = 1 + 0.5 * (self.wave_number - 1)
+            if speed > 40:
+                speed = 40
+            self.create_enemy(hp, speed)
 
     def add_enemy(self, hp, speed):
         if self.phase == "wave":
@@ -163,7 +169,9 @@ class MyApp:
     def create_enemy(self, hp, speed):
         if self.current_wave > 0:
             self.current_wave -= 1
-            self.delay_between_spawn -= self.delay_between_spawn / 100
+            self.delay_between_spawn -= self.delay_between_spawn / 200
+            if self.delay_between_spawn < 100:
+                self.delay_between_spawn = 100
             root.after(int(self.delay_between_spawn), self.add_enemy, hp, speed)
         else:
             self.phase = "shopping"
@@ -175,7 +183,7 @@ class MyApp:
             dx = point.x - bullet.x
             dy = point.y - bullet.y
             dist = sqrt(pow(dx, 2) + pow(dy, 2))
-            if dist < (DEFAULT_CONFIG["enemy_size"] + bullet.side) / 2 and bullet.hits > 0:
+            if enemy not in bullet.enemies_hit and dist < (DEFAULT_CONFIG["enemy_size"] + bullet.side) / 2 and bullet.hits > 0:
                 bullet.hits -= 1
                 print(bullet.hits)
                 print("\n\n\n\n\n")
@@ -183,19 +191,31 @@ class MyApp:
                 self.enemies[i].hp -= bullet.damage
                 print("Enemy hit appended: {}\n".format(bullet.enemies_hit))
 
+    def change_target_mode(self):
+        self.turret.target_mode = "first" if self.turret.target_mode == "last" else "last"
+
+    def append_turrets_in_range(self, enemy, turret):
+        x = enemy.x
+        y = enemy.y
+        dxc = x - turret.x
+        dyc = y - turret.y
+        dis = sqrt(pow(dxc, 2) + pow(dyc, 2))
+        if dis < turret.range:
+            turret.in_range.append(enemy)
+
+
     def turret_attack(self, turret):
         if turret.loaded == 1:
             turret.loaded = 0
             root.after(int(turret.load_time), turret.reload)
             turret.in_range = []
-            for enemy in self.enemies[::-1]:
-                x = enemy.x
-                y = enemy.y
-                dxc = x - turret.x
-                dyc = y - turret.y
-                dis = sqrt(pow(dxc, 2) + pow(dyc, 2))
-                if dis < turret.range:
-                    turret.in_range.append(enemy)
+            # TARGET - FIRST / LAST
+            if turret.target_mode == "first":
+                for enemy in self.enemies[::-1]:
+                    self.append_turrets_in_range(enemy, turret)
+            elif turret.target_mode == "last":
+                for enemy in self.enemies:
+                    self.append_turrets_in_range(enemy, turret)
             if len(turret.in_range) > 0:
                 enemy = turret.in_range[0]
 
@@ -272,7 +292,7 @@ class MyApp:
         if self.turret:
             self.turret.draw_range(self.canvas)
             self.canvas.create_text(DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"] - 10, DEFAULT_CONFIG["side"] * (DEFAULT_CONFIG["rows"] + 1) + 10,
-                                    fill="black", font="arial 15", text="Vylepšit za {}$   Prodat za {}$".format(self.turret.cost * 2, self.turret.total_cost / 2), anchor=NE)
+                                    fill="black", font="arial 15", text="Target mode: {}   Vylepšit za {}$   Prodat za {}$".format(self.turret.target_mode, self.turret.cost * 2, int(self.turret.total_cost / 2)), anchor=NE)
         self.canvas.create_text((DEFAULT_CONFIG["side"]*DEFAULT_CONFIG["cols"] - 10), DEFAULT_CONFIG["side"] / 2,
                                 fill="yellow", font="times 30 italic bold", text="{}$".format(self.money), anchor=E)
         self.canvas.create_text(10, DEFAULT_CONFIG["side"] / 2, fill="black", font="arial 30",

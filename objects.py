@@ -96,6 +96,7 @@ class Turret(Square):
         self.range = DEFAULT_CONFIG["side"] * 3
         self.in_range = []
         self.fill_color = "white"
+        self.target_mode = "first"
 
     def __repr__(self):
         return "Turret(x: {}, y: {})".format(self.x, self.y)
@@ -211,7 +212,7 @@ class Enemy(Square):
     def __init__(self, x, y, hp=100, speed=1):
         super().__init__(x, y)
         self.hp = hp
-        self.speed = speed if speed <= 35 else 35
+        self.speed = speed
         self.vel_x = 1
         self.vel_y = 0
         self.fill_color = "orange"
