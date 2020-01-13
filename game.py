@@ -5,7 +5,6 @@ from tkinter.filedialog import *
 from objects import *
 from json import dumps
 from ast import literal_eval
-from PIL import Image, ImageTk
 
 class MyApp:
     def __init__(self, parent):
@@ -46,12 +45,6 @@ class MyApp:
         self.enemy_start_y = None
         self.hp = 5
         self.money = 0
-        self.image = Image.open("image.jpg")
-        self.image = self.image.resize((int(DEFAULT_CONFIG["enemy_size"] / sqrt(2)), int(DEFAULT_CONFIG["enemy_size"] / sqrt(2))), Image.ANTIALIAS)
-        self.img = ImageTk.PhotoImage(self.image)
-        self.image = Image.open("image.jpg")
-        self.image = self.image.resize((DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["cols"], DEFAULT_CONFIG["side"] * DEFAULT_CONFIG["rows"]), Image.ANTIALIAS)
-        self.endimg = ImageTk.PhotoImage(self.image)
         self.file = None
         self.breakloop = False
         self.turrets = []
@@ -71,7 +64,7 @@ class MyApp:
         self.enemy_start_x = None
         self.enemy_start_y = None
         self.hp = 5
-        self.money = 500
+        self.money = 200
         self.squares = []
         self.square = None
         self.current_wave = 0
@@ -93,6 +86,7 @@ class MyApp:
         self.canvas.pack(fill=BOTH, expand=True)
         self.canvas.bind("<ButtonPress-1>", self.on_button_press)
         self.canvas.bind("<ButtonPress-3>", self.on_button_press)
+        self.canvas.bind("<KeyPress>", self.key_press)
         button_rectangle = Button(self.container, text="Turret Big (100$)", command=self.turret_add_big)
         button_rectangle.pack(side=LEFT)
         button_rectangle = Button(self.container, text="Turret Fast (100$)", command=self.turret_add_fast)
@@ -152,14 +146,13 @@ class MyApp:
             self.bullets.clear()
             hp = 100 + 50 * (self.wave_number - 1)
             speed = 1 + 0.5 * (self.wave_number - 1)
-            if speed > 40:
-                speed = 40
+            if speed > 30:
+                speed = 30
             self.create_enemy(hp, speed)
 
     def add_enemy(self, hp, speed):
         if self.phase == "wave":
             self.enemy = Enemy(self.enemy_start_x, self.enemy_start_y, hp, speed)
-            self.enemy.img = self.img
             for square in self.squares:
                 if square.path:
                     self.enemy.path.append(square)
@@ -183,8 +176,9 @@ class MyApp:
             dx = point.x - bullet.x
             dy = point.y - bullet.y
             dist = sqrt(pow(dx, 2) + pow(dy, 2))
-            if enemy not in bullet.enemies_hit and dist < (DEFAULT_CONFIG["enemy_size"] + bullet.side) / 2 and bullet.hits > 0:
-                bullet.hits -= 1
+            if (enemy not in bullet.enemies_hit or bullet.turret_type == "fast") and dist < (DEFAULT_CONFIG["enemy_size"] + bullet.side) / 2 and bullet.hits > 0:
+                if bullet.immortal == False:
+                    bullet.hits -= 1
                 print(bullet.hits)
                 print("\n\n\n\n\n")
                 bullet.enemies_hit.append(enemy)
@@ -203,13 +197,9 @@ class MyApp:
         if dis < turret.range:
             turret.in_range.append(enemy)
 
-
     def turret_attack(self, turret):
         if turret.loaded == 1:
-            turret.loaded = 0
-            root.after(int(turret.load_time), turret.reload)
             turret.in_range = []
-            # TARGET - FIRST / LAST
             if turret.target_mode == "first":
                 for enemy in self.enemies[::-1]:
                     self.append_turrets_in_range(enemy, turret)
@@ -236,7 +226,11 @@ class MyApp:
                 if enemy.y - turret.y < 0:
                     vel_y *= -1
 
-                self.bullet = Bullet(turret.x, turret.y, vel_x, vel_y, turret.damage, turret.bullet_size, turret.bullet_hits)
+                turret.loaded = 0
+                root.after(int(turret.load_time), turret.reload)
+                self.bullet = Bullet(turret.x, turret.y, vel_x, vel_y, turret.damage, turret.bullet_size, turret.bullet_hits, turret.turret_type)
+                if turret.turret_type == "big" and turret.level > 10:
+                    self.bullet.immortal = True
         else:
             self.bullet = None
 
@@ -333,7 +327,6 @@ class MyApp:
 
     def end_game_dialog(self):
         print("Konec hry")
-        self.canvas.create_image(DEFAULT_CONFIG["side"] * 5, DEFAULT_CONFIG["side"] * 6, image=self.endimg)
         if askyesno('Konec hry', 'Chcete začít novou hru?'):
             self.create_game()
             print("_____________NEW GAME_____________")
@@ -346,12 +339,12 @@ class MyApp:
     def turret_add_fast(self):
         self.turret_add("fast")
 
-    def turret_add(self, type):
+    def turret_add(self, turret_type):
         if self.square and not self.square.path:
             if not self.square.turret_built:
-                if type == "big":
+                if turret_type == "big":
                     self.turret = TurretBig(self.square.x, self.square.y)
-                elif type == "fast":
+                elif turret_type == "fast":
                     self.turret = TurretFast(self.square.x, self.square.y)
                 if self.money >= self.turret.cost:
                     self.money -= self.turret.cost
@@ -406,6 +399,22 @@ class MyApp:
             if turret.detect_cursor(point) and event.num == 1:
                 self.turret = turret
 
+    def key_press(self, event):
+        print (event)
+        if event.char == "+":
+            self.turret_add_big()
+        if event.char == "ě":
+            self.turret_add_fast()
+        if event.keysym == "Delete" or event.keysym == "x":
+            self.turret_sell()
+        if event.keysym == "q":
+            self.turret_upgrade()
+        if event.keysym == "n":
+            self.create_wave()
+        if event.keysym == "a":
+            self.auto_new_wave()
+        if event.keysym == "t":
+            self.change_target_mode()
 
 root = Tk()
 #root.attributes("-fullscreen", True)

@@ -97,6 +97,7 @@ class Turret(Square):
         self.in_range = []
         self.fill_color = "white"
         self.target_mode = "first"
+        self.turret_type = None
 
     def __repr__(self):
         return "Turret(x: {}, y: {})".format(self.x, self.y)
@@ -135,10 +136,11 @@ class TurretBig(Turret):
         self.x = x + DEFAULT_CONFIG["side"] / 2
         self.y = y + DEFAULT_CONFIG["side"] / 2
         self.fill_color = "red"
-        self.type = "big"
+        self.turret_type = "big"
         self.load_time = 2000
         self.size_amp = self.damage_amp
         self.damage_amp = 2
+        self.damage = 10
 
     def __repr__(self):
         return "Turret_Big(x: {}, y: {}, bullet_size: {}, damage: {} )".format(self.x, self.y, self.bullet_size, self.damage)
@@ -153,6 +155,8 @@ class TurretBig(Turret):
         else:
             self.bullet_size *= self.size_amp
         self.bullet_hits += 1
+        if self.level > 5:
+            self.damage_amp = 1.2
 
 
 class TurretFast(Turret):
@@ -161,7 +165,7 @@ class TurretFast(Turret):
         self.x = x + DEFAULT_CONFIG["side"] / 2
         self.y = y + DEFAULT_CONFIG["side"] / 2
         self.fill_color = "green"
-        self.type = "fast"
+        self.turret_type = "fast"
 
     def __repr__(self):
         return "Turret_Big(x: {}, y: {}, load_time: {}, damage: {} )".format(self.x, self.y, self.load_time, self.damage)
@@ -176,13 +180,16 @@ class TurretFast(Turret):
         else:
             self.load_time -= self.load_time_diff
         self.bullet_hits += 1
+        if self.level > 5:
+            self.damage_amp = 1.5
 
 
 class Bullet(Square):
-    def __init__(self, x, y, vel_x, vel_y, damage, side, hits):
+    def __init__(self, x, y, vel_x, vel_y, damage, side, hits, turrtype="big"):
         self.x = x
         self.y = y
         self.fill_color = "black"
+        self.turret_type = turrtype
         self.side = side
         self.speed = 20
         self.hits = hits
@@ -191,6 +198,7 @@ class Bullet(Square):
         self.vel_x = vel_x
         self.vel_y = vel_y
         self.enemies_hit = []
+        self.immortal = True
 
     def __repr__(self):
         return "Bullet(x: {}, y: {}, bullet_size: {}, damage: {}, hits: {})".format(self.x, self.y, self.side, self.damage, self.hits)
@@ -218,7 +226,6 @@ class Enemy(Square):
         self.fill_color = "orange"
         self.side = DEFAULT_CONFIG["enemy_size"]
         self.path = []
-        self.img = None
         self.reward = int((self.hp * self.speed) / 20)
 
     def __repr__(self):
@@ -226,7 +233,6 @@ class Enemy(Square):
 
     def draw(self, canvas):
         canvas.create_oval(self.x - self.side / 2, self.y - self.side / 2, self.x + self.side / 2, self.y + self.side / 2, fill=self.fill_color, outline=self.outline_color, width=self.outline_width)
-        canvas.create_image(self.x, self.y, image=self.img)
 
     def move(self):
         self.x += self.vel_x * self.speed
@@ -282,7 +288,7 @@ class Enemy(Square):
             dx = point.x - self.x
             dy = point.y - self.y
             dist = sqrt(pow(dx, 2) + pow(dy, 2))
-            if dist < 5:
+            if dist < 10:
                 self.path.remove(s)
                 print("Passed appended: {}".format(s))
                 self.set_dir()
